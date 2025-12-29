@@ -25,8 +25,8 @@ const CONFIG = {
 const LOG_DIR = './logs';
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
-const HISTORY_FILE = path.join(LOG_DIR, 'history.jsonl');
-const REVOKE_FILE = path.join(LOG_DIR, 'revoked_events.jsonl');
+const HISTORY_FILE = path.join(LOG_DIR, 'history.json');
+const REVOKE_FILE = path.join(LOG_DIR, 'revoked_events.json');
 
 // RAM Cache to store recent messages
 const messageCache = new Map();
