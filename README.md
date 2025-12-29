@@ -1,4 +1,5 @@
-# 📱 WhatsApp Logger & Anti-Delete Bot ARM/RASPBERRY PI Branch
+# 📱 WhatsApp Logger & Anti-Delete Bot ARM Branch
+For normal x86/x64 switch branch
 
 A lightweight WhatsApp bot based on [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) that monitors messages in real-time and logs deleted messages.
 
