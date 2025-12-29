@@ -12,7 +12,7 @@ const CONFIG = {
     LOG_STRATEGY: 'DELETED_ONLY',
 
     // Set to true to reply to the chat when a message is deleted
-    ENABLE_PUBLIC_ALERT: true,
+    ENABLE_PUBLIC_ALERT: false,
 
     // The message you want the bot to say
     ALERT_TEXT: "I saw that! 👁️ This message has been logged to my server."
@@ -25,17 +25,20 @@ const CONFIG = {
 const LOG_DIR = './logs';
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
-const HISTORY_FILE = path.join(LOG_DIR, 'history.jsonl');
-const REVOKE_FILE = path.join(LOG_DIR, 'revoked_events.jsonl');
+const HISTORY_FILE = path.join(LOG_DIR, 'history.json');
+const REVOKE_FILE = path.join(LOG_DIR, 'revoked_events.json');
 
 // RAM Cache to store recent messages
 const messageCache = new Map();
 
 const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: '/usr/src/app/.wwebjs_auth' }),
+    restartOnAuthFail: true, 
+    authStrategy: new LocalAuth({ 
+        dataPath: '/usr/src/app/.wwebjs_auth',
+        clientId: 'client-one' 
+    }),
     puppeteer: {
         executablePath: '/usr/bin/chromium',
-
         headless: true,
         args: [
             '--no-sandbox',
@@ -44,7 +47,9 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--single-process' 
         ]
     }
 });
@@ -151,3 +156,18 @@ client.on('message_revoke_everyone', async (after, before) => {
 });
 
 client.initialize();
+
+const shutdown = async (signal) => {
+    console.log(`Received ${signal}. Closing client gracefully...`);
+    try {
+        await client.destroy();
+        console.log('Client destroyed. Session closed cleanly.');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
