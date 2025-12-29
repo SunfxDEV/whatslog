@@ -3,78 +3,141 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 
-// Ensure log directory exists
+// =========================================================
+//  CONFIGURATION SECTION
+// =========================================================
+
+const CONFIG = {
+    // 'ALL' or 'DELETED_ONLY'
+    LOG_STRATEGY: 'DELETED_ONLY',
+
+    // Set to true to reply to the chat when a message is deleted
+    ENABLE_PUBLIC_ALERT: true,
+
+    // The message you want the bot to say
+    ALERT_TEXT: "I saw that! 👁️ This message has been logged to my server."
+};
+
+// =========================================================
+//  SETUP
+// =========================================================
+
 const LOG_DIR = './logs';
-if (!fs.existsSync(LOG_DIR)){
-    fs.mkdirSync(LOG_DIR);
-}
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
 const HISTORY_FILE = path.join(LOG_DIR, 'history.jsonl');
 const REVOKE_FILE = path.join(LOG_DIR, 'revoked_events.jsonl');
 
-// Initialize Client with Puppeteer configurations for Docker
+// RAM Cache to store recent messages
+const messageCache = new Map();
+
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/usr/src/app/.wwebjs_auth' }),
     puppeteer: {
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote', '--disable-gpu']
     }
 });
 
-// Generate QR Code for authentication
+function cleanCache() {
+    if (messageCache.size > 5000) {
+        const keysToDelete = Array.from(messageCache.keys()).slice(0, 1000);
+        keysToDelete.forEach(key => messageCache.delete(key));
+    }
+}
+
+// =========================================================
+//  BOT LOGIC
+// =========================================================
+
 client.on('qr', (qr) => {
     console.log('SCAN THIS QR CODE TO LOGIN:');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
-    console.log('Client is ready and listening!');
+    console.log(`Client is ready! Mode: ${CONFIG.LOG_STRATEGY}`);
 });
 
-// 1. SAVE INCOMING MESSAGES
+// 1. LISTEN FOR INCOMING MESSAGES
 client.on('message_create', async msg => {
-    // Only log text messages or easy-to-read types
     if(msg.body) {
-        const logEntry = {
-            id: msg.id.id,
-            timestamp: new Date().toISOString(),
-            sender: msg.from, // Number or Group ID
-            author: msg.author, // Actual sender in a group
-            content: msg.body,
-            hasMedia: msg.hasMedia
-        };
+        try {
+            // SAFE EXTRACTION: We stop using getContact() as it causes crashes
+            // We strip the suffix (@c.us) to get the number
+            const safeNumber = msg.from.replace(/@c.us|@g.us/g, '');
 
-        // Append to history file (JSONL format)
-        fs.appendFile(HISTORY_FILE, JSON.stringify(logEntry) + '\n', (err) => {
-            if (err) console.error('Error writing to log:', err);
-        });
+            // Try to get chat name safely
+            let chatName = 'Unknown Chat';
+            try {
+                const chat = await msg.getChat();
+                chatName = chat.name || safeNumber;
+            } catch(e) {
+                chatName = safeNumber;
+            }
+
+            const logEntry = {
+                id: msg.id.id,
+                timestamp: new Date().toISOString(),
+                sender_number: `+${safeNumber}`,
+                chat_name: chatName,
+                content: msg.body,
+                hasMedia: msg.hasMedia,
+                remote_chat_id: msg.id.remote // Store this for later use
+            };
+
+            // Save to RAM
+            messageCache.set(msg.id.id, logEntry);
+            cleanCache();
+
+            if (CONFIG.LOG_STRATEGY === 'ALL') {
+                fs.appendFile(HISTORY_FILE, JSON.stringify(logEntry) + '\n', (err) => {
+                    if (err) console.error('Error writing to history:', err);
+                });
+            }
+
+        } catch (error) {
+            console.error('Error processing message:', error.message);
+        }
     }
 });
 
-// 2. CAPTURE DELETION EVENTS
-// This event fires when someone uses "Delete for Everyone"
+// 2. LISTEN FOR DELETIONS
 client.on('message_revoke_everyone', async (after, before) => {
-    if (before) {
-        console.log(`[ALERT] Message deleted: "${before.body}"`);
+    try {
+        const msgId = after.id.id;
+        const cachedMsg = messageCache.get(msgId);
 
-        const revokeEntry = {
-            deleted_at: new Date().toISOString(),
-            original_message_id: before.id.id,
-            original_content: before.body, // We log it again just in case
-            sender: before.from
-        };
+        // Use cached message or fallback to 'before'
+        const finalLog = cachedMsg || (before ? {
+            timestamp: new Date().toISOString(),
+            content: before.body,
+            sender_number: "Unknown (Not in cache)",
+            id: before.id.id,
+            remote_chat_id: before.id.remote
+        } : null);
 
-        fs.appendFile(REVOKE_FILE, JSON.stringify(revokeEntry) + '\n', (err) => {
-            if (err) console.error('Error logging revocation:', err);
-        });
+        if (finalLog) {
+            console.log(`[ALERT] Message deleted: "${finalLog.content}"`);
+
+            // Write to log
+            const revokeEntry = { ...finalLog, deleted_at: new Date().toISOString() };
+            fs.appendFile(REVOKE_FILE, JSON.stringify(revokeEntry) + '\n', (err) => {
+                if (err) console.error('Error logging revocation:', err);
+            });
+
+            // Send Public Alert
+            if (CONFIG.ENABLE_PUBLIC_ALERT) {
+                if(finalLog.remote_chat_id) {
+                    client.sendMessage(finalLog.remote_chat_id, CONFIG.ALERT_TEXT).catch(e => {
+                        console.error("Could not send alert message:", e.message);
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        // This prevents the bot from crashing if something goes wrong here
+        console.error("CRITICAL ERROR in revocation handler (Bot continued running):", error);
     }
 });
 

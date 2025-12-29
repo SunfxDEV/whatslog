@@ -6,7 +6,6 @@ services:
     container_name: wa-logger
     restart: unless-stopped
     volumes:
-      # Persist the session (Login)
       - ./auth_data:/usr/src/app/.wwebjs_auth
-      # Persist the logs (The saved messages)
       - ./logs:/usr/src/app/logs
+      - ./index.js:/usr/src/app/index.js

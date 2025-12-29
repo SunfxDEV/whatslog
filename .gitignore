@@ -1,1 +1,4 @@
 /.idea
+/auth_data
+/logs
+/node_modules
