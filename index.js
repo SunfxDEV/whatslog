@@ -12,7 +12,7 @@ const CONFIG = {
     LOG_STRATEGY: 'DELETED_ONLY',
 
     // Set to true to reply to the chat when a message is deleted
-    ENABLE_PUBLIC_ALERT: true,
+    ENABLE_PUBLIC_ALERT: false,
 
     // The message you want the bot to say
     ALERT_TEXT: "I saw that! 👁️ This message has been logged to my server."
@@ -151,3 +151,40 @@ client.on('message_revoke_everyone', async (after, before) => {
 });
 
 client.initialize();
+
+// =========================================================
+//  GRACEFUL SHUTDOWN HANDLER
+// =========================================================
+// This ensures Chrome closes if the bot crashes or is stopped
+
+const cleanup = async (signal) => {
+    console.log(`[SYSTEM] Received ${signal}. Shutting down gracefully...`);
+    try {
+        // Save cache one last time
+        saveCacheToDisk();
+
+        // Destroy the client (closes the browser)
+        await client.destroy();
+        console.log('[SYSTEM] Client destroyed.');
+    } catch (err) {
+        console.error('[SYSTEM] Error during cleanup:', err.message);
+    } finally {
+        console.log('[SYSTEM] Exiting now.');
+        process.exit(0);
+    }
+};
+
+// Listen for termination signals
+process.on('SIGINT', () => cleanup('SIGINT'));   // Ctrl+C
+process.on('SIGTERM', () => cleanup('SIGTERM')); // Docker stop
+process.on('SIGHUP', () => cleanup('SIGHUP'));   // Terminal closed
+
+// Optional: Catch unhandled crashes
+process.on('uncaughtException', async (err) => {
+    console.error('[SYSTEM] Uncaught Exception:', err);
+    await cleanup('UNCAUGHT_EXCEPTION');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[SYSTEM] Unhandled Rejection at:', promise, 'reason:', reason);
+});
