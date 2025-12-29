@@ -34,8 +34,18 @@ const messageCache = new Map();
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/usr/src/app/.wwebjs_auth' }),
     puppeteer: {
+        executablePath: '/usr/bin/chromium',
+
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote', '--disable-gpu']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ]
     }
 });
 
@@ -102,7 +112,6 @@ client.on('message_create', async msg => {
     }
 });
 
-// 2. LISTEN FOR DELETIONS
 client.on('message_revoke_everyone', async (after, before) => {
     try {
         const msgId = after.id.id;
