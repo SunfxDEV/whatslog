@@ -6,7 +6,16 @@ services:
     container_name: wa-logger
     restart: unless-stopped
     init: true
-    stop_grace_period: 2m # Allow up to 2 minutes for graceful shutdown
+    stop_grace_period: 2m
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'        
+          memory: 800M        
+        reservations:
+          memory: 256M        
+
     volumes:
       - ./auth_data:/usr/src/app/.wwebjs_auth
       - ./logs:/usr/src/app/logs

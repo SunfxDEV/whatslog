@@ -1,6 +1,5 @@
 FROM node:18-slim
 
-# manual chromium cause pupeteers doesnt work on ARM
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libatk1.0-0 \
@@ -17,6 +16,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /usr/src/app
 
 COPY package*.json ./
+
 RUN npm install
 
 COPY . .

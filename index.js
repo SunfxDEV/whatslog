@@ -34,16 +34,25 @@ const messageCache = new Map();
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/usr/src/app/.wwebjs_auth' }),
     puppeteer: {
-
+        
         headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
+            
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--mute-audio',
+            '--blink-settings=imagesEnabled=false',
+            '--disable-background-timer-throttling',
+            '--disable-extensions',
+            '--disable-component-extensions-with-background-pages',
+            '--disable-default-apps',
+            '--disable-features=Translate',
+            '--disable-speech-api'
         ]
     }
 });
@@ -154,14 +163,10 @@ client.initialize();
 // =========================================================
 //  GRACEFUL SHUTDOWN HANDLER
 // =========================================================
-// This ensures Chrome closes if the bot crashes or is stopped
 
 const cleanup = async (signal) => {
     console.log(`[SYSTEM] Received ${signal}. Shutting down gracefully...`);
     try {
-        // Save cache one last time
-        saveCacheToDisk();
-
         // Destroy the client (closes the browser)
         await client.destroy();
         console.log('[SYSTEM] Client destroyed.');
