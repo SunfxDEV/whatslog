@@ -1,6 +1,4 @@
 # 📱 WhatsApp Logger & Anti-Delete Bot
-## This code has been optimized for use with a RASPBERRY PI (ARM Architecture)
-## It will run horribly on x86/x64, request if needed under ISSUES
 
 A lightweight WhatsApp bot based on [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) that monitors messages in real-time and logs deleted messages.
 

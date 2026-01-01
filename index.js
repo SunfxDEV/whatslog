@@ -34,7 +34,6 @@ const messageCache = new Map();
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/usr/src/app/.wwebjs_auth' }),
     puppeteer: {
-        executablePath: '/usr/bin/chromium',
 
         headless: true,
         args: [
